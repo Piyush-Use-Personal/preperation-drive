@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertCircle, CheckCircle2, Circle, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Circle, Download, XCircle } from "lucide-react";
 import { MarkdownText } from "@/components/design/MarkdownText";
 import { SurfaceCard } from "@/components/design/SurfaceCard";
 import { QuestionTypeBadge } from "@/components/design/QuestionTypeBadge";
@@ -18,6 +18,52 @@ type Q = {
   correctIndices?: number[];
   referenceAnswer?: string;
 };
+
+type AnswerRow = { questionId: string; optionIndices?: number[]; text?: string };
+
+function formatOptionAnswer(q: Q, indices: number[] | undefined): string {
+  if (!indices?.length) return "";
+  return indices
+    .map((idx) => (q.options[idx] ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function formatCorrectForExport(q: Q): string {
+  if (q.type === "text") return (q.referenceAnswer ?? "").trim();
+  const idx = q.correctIndices;
+  if (!idx?.length) return "";
+  return formatOptionAnswer(q, idx);
+}
+
+function formatGivenForExport(q: Q, ans: AnswerRow | undefined): string {
+  if (q.type === "text") return (ans?.text ?? "").trim();
+  return formatOptionAnswer(q, ans?.optionIndices);
+}
+
+function buildResultExportText(
+  fileName: string,
+  attemptId: string,
+  score: number,
+  maxScore: number,
+  questions: Q[],
+  answers: AnswerRow[],
+): string {
+  const rows = questions.map((q) => ({
+    q: q.text.trim(),
+    a: formatGivenForExport(q, answers.find((x) => x.questionId === q.id)),
+    c: formatCorrectForExport(q),
+  }));
+  const nomenclature = [
+    "# PrepDrive — result export (plain text file; JSON array below). UTF-8.",
+    "# Nomenclature (each record): q = question prompt, a = answer given by learner, c = correct or reference answer (empty if not shown to this export).",
+    `# Test: "${fileName.replace(/"/g, '\\"')}" | attemptId: ${attemptId} | score: ${score}/${maxScore}`,
+  ].join("\n");
+  const analyzeLine =
+    "# ANALYZE_THIS_DOCUMENT: Review each item for correctness vs c, learning gaps, and concise feedback the learner could use.";
+  const json = JSON.stringify(rows, null, 2);
+  return `${nomenclature}\n${analyzeLine}\n\n${json}\n`;
+}
 
 export default function ResultPage() {
   const params = useParams();
@@ -121,13 +167,45 @@ export default function ResultPage() {
 
   const isOwner = viewerRole === "owner";
 
+  function downloadResultExport() {
+    if (!file || !attempt) return;
+    const text = buildResultExportText(
+      file.name,
+      attemptId,
+      attempt.score,
+      attempt.maxScore,
+      file.questions,
+      attempt.answers,
+    );
+    const safe = file.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").slice(0, 48) || "result";
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safe}-${attemptId.slice(-8)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="px-4 pt-6 pb-12">
       <Link href={isOwner ? `/file/${file.id}` : "/shared"} className="text-sm font-medium text-indigo-600">
         ← Back
       </Link>
-      <h1 className="mt-4 text-xl font-semibold tracking-tight text-gray-900">Results</h1>
-      <p className="mt-1 text-sm text-gray-500">{file.name}</p>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-gray-900">Results</h1>
+          <p className="mt-1 text-sm text-gray-500">{file.name}</p>
+        </div>
+        <button
+          type="button"
+          onClick={downloadResultExport}
+          className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 active:scale-[0.99] sm:self-auto"
+        >
+          <Download className="h-4 w-4 text-indigo-600" strokeWidth={2} />
+          Download result (.txt)
+        </button>
+      </div>
 
       <SurfaceCard className="mt-6 overflow-hidden p-0 text-center">
         <div className="bg-gradient-to-b from-indigo-50/90 to-white px-6 py-8">
