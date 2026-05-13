@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { BottomSheet } from "@/components/design/BottomSheet";
 import { MarkdownText } from "@/components/design/MarkdownText";
 import { SurfaceCard } from "@/components/design/SurfaceCard";
@@ -19,14 +19,16 @@ type Q = {
 
 type Answer = { questionId: string; optionIndices?: number[]; text?: string };
 
+function isQuestionComplete(q: Q, a: Answer | undefined): boolean {
+  if (!a) return false;
+  if (q.type === "text") return (a.text ?? "").trim().length > 0;
+  return (a.optionIndices?.length ?? 0) > 0;
+}
+
 function answeredCount(questions: Q[], answers: Record<string, Answer>) {
   let n = 0;
   for (const q of questions) {
-    const a = answers[q.id];
-    if (!a) continue;
-    if (q.type === "text") {
-      if ((a.text ?? "").trim().length > 0) n++;
-    } else if ((a.optionIndices?.length ?? 0) > 0) n++;
+    if (isQuestionComplete(q, answers[q.id])) n++;
   }
   return n;
 }
@@ -42,7 +44,9 @@ export default function AttemptPage() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [loading, setLoading] = useState(true);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  const [jumpOpen, setJumpOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const questionAnchors = useRef<Record<string, HTMLDivElement | null>>({});
 
   const flushSave = useCallback(
     async (next: Record<string, Answer>) => {
@@ -106,6 +110,16 @@ export default function AttemptPage() {
   const done = useMemo(() => answeredCount(questions, answers), [questions, answers]);
   const total = questions.length;
   const progress = total ? Math.round((done / total) * 100) : 0;
+  const incompleteQuestions = useMemo(
+    () => questions.filter((q) => !isQuestionComplete(q, answers[q.id])),
+    [questions, answers],
+  );
+
+  function scrollToQuestion(questionId: string) {
+    const el = questionAnchors.current[questionId];
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setJumpOpen(false);
+  }
 
   function setAnswer(q: Q, patch: Partial<Answer>) {
     setAnswers((prev) => {
@@ -174,21 +188,83 @@ export default function AttemptPage() {
 
       {total > 0 && (
         <div
-          className="sticky top-0 z-20 -mx-4 mt-4 border-y border-gray-200/90 bg-gray-50/95 px-4 py-2.5 shadow-sm backdrop-blur-sm supports-[backdrop-filter]:bg-gray-50/85"
-          role="status"
-          aria-label={`${done} of ${total} questions completed`}
+          className="sticky top-0 z-20 -mx-4 mt-4 overflow-hidden rounded-xl border border-gray-200/90 bg-gray-50/95 shadow-md backdrop-blur-sm supports-[backdrop-filter]:bg-gray-50/88"
         >
-          <div className="flex items-center justify-between gap-3 text-xs font-medium text-gray-600">
-            <span>Questions completed</span>
-            <span className="shrink-0 tabular-nums text-gray-900">
-              {done} <span className="text-gray-400">/</span> {total}
-            </span>
+          <div
+            className="px-4 py-2.5"
+            role="status"
+            aria-label={`${done} of ${total} questions completed`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs font-medium text-gray-600">
+              <span className="min-w-0">Questions completed</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="tabular-nums text-gray-900">
+                  {done} <span className="text-gray-400">/</span> {total}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setConfirmSubmitOpen(true)}
+                  disabled={saveState === "saving"}
+                  title="Submit your answers and go to results"
+                  aria-label="Submit attempt and view results"
+                  className="rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saveState === "saving" ? "Saving…" : "Submit"}
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200/90">
+              <div
+                className="h-full rounded-full bg-indigo-500 transition-[width] duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200/90">
-            <div
-              className="h-full rounded-full bg-indigo-500 transition-[width] duration-300 ease-out"
-              style={{ width: `${progress}%` }}
-            />
+
+          <div className="border-t border-gray-200/80 bg-white/75 px-3 py-1.5 backdrop-blur-[2px]">
+            <button
+              type="button"
+              onClick={() => setJumpOpen((o) => !o)}
+              className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-2 text-left text-xs font-semibold text-gray-700 transition hover:bg-gray-100/80"
+              aria-expanded={jumpOpen}
+            >
+              <span>
+                Unanswered
+                {incompleteQuestions.length > 0 ? (
+                  <span className="ml-1.5 font-normal text-gray-500">({incompleteQuestions.length})</span>
+                ) : null}
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-gray-500 transition-transform duration-200 ${jumpOpen ? "rotate-180" : ""}`}
+                strokeWidth={2}
+                aria-hidden
+              />
+            </button>
+            {jumpOpen && (
+              <div className="border-t border-gray-100/90 px-1 pb-2.5 pt-2">
+                {incompleteQuestions.length === 0 ? (
+                  <p className="text-xs text-gray-500">All questions have an answer. You can still scroll to review.</p>
+                ) : (
+                  <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+                    {questions
+                      .map((q, idx) => ({ q, num: idx + 1 }))
+                      .filter(({ q }) => !isQuestionComplete(q, answers[q.id]))
+                      .map(({ q, num }) => (
+                        <li key={q.id} className="list-none">
+                          <button
+                            type="button"
+                            onClick={() => scrollToQuestion(q.id)}
+                            title={`Go to question ${num}`}
+                            className="flex h-9 min-w-9 items-center justify-center rounded-full border-2 border-dashed border-amber-400/90 bg-amber-50/80 px-2 text-xs font-bold text-amber-950 shadow-sm transition hover:border-amber-500 hover:bg-amber-100 active:scale-95"
+                          >
+                            {num}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -197,7 +273,14 @@ export default function AttemptPage() {
         {questions.map((q, i) => {
           const a = answers[q.id] ?? { questionId: q.id };
           return (
-            <SurfaceCard key={q.id} className="p-5">
+            <div
+              key={q.id}
+              ref={(el) => {
+                questionAnchors.current[q.id] = el;
+              }}
+              className={jumpOpen ? "scroll-mt-52" : "scroll-mt-36"}
+            >
+              <SurfaceCard className="p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-gray-400">Q{i + 1}</span>
                 <QuestionTypeBadge type={q.type} />
@@ -307,6 +390,7 @@ export default function AttemptPage() {
                 </div>
               )}
             </SurfaceCard>
+            </div>
           );
         })}
       </div>
