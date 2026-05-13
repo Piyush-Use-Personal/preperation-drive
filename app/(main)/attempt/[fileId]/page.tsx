@@ -173,14 +173,18 @@ export default function AttemptPage() {
       <p className="mt-1 text-sm text-gray-500">Scroll through all questions, then submit.</p>
 
       {total > 0 && (
-        <div className="mt-4">
-          <div className="mb-1 flex justify-between text-xs font-medium text-gray-600">
-            <span>Progress</span>
-            <span>
-              {done} / {total} answered
+        <div
+          className="sticky top-0 z-20 -mx-4 mt-4 border-y border-gray-200/90 bg-gray-50/95 px-4 py-2.5 shadow-sm backdrop-blur-sm supports-[backdrop-filter]:bg-gray-50/85"
+          role="status"
+          aria-label={`${done} of ${total} questions completed`}
+        >
+          <div className="flex items-center justify-between gap-3 text-xs font-medium text-gray-600">
+            <span>Questions completed</span>
+            <span className="shrink-0 tabular-nums text-gray-900">
+              {done} <span className="text-gray-400">/</span> {total}
             </span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200/90">
             <div
               className="h-full rounded-full bg-indigo-500 transition-[width] duration-300 ease-out"
               style={{ width: `${progress}%` }}
