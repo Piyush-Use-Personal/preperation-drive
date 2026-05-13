@@ -192,39 +192,46 @@ export default function ResultPage() {
                   <MarkdownText content={q.text} className="mt-2 text-sm font-medium leading-relaxed text-gray-900" />
                   {q.type !== "text" && (
                     <div className="mt-2 text-sm text-gray-700">
-                      <span className="text-gray-500">Your answer:</span>{" "}
-                      {ans?.optionIndices?.length ? (
-                        <span>
-                          {ans.optionIndices.map((idx, i) => (
-                            <span key={idx}>
-                              <MarkdownText content={q.options[idx] ?? String(idx)} inline className="inline" />
-                              {i < (ans.optionIndices?.length ?? 0) - 1 ? ", " : ""}
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
+                      <span className="font-medium text-gray-600">Your answer</span>
+                      <div className="mt-1 rounded-lg bg-gray-50 px-3 py-2 text-gray-900">
+                        {ans?.optionIndices?.length ? (
+                          <span>
+                            {ans.optionIndices.map((idx, j) => (
+                              <span key={`${idx}-${j}`}>
+                                <MarkdownText content={q.options[idx] ?? String(idx)} inline className="inline" />
+                                {j < (ans.optionIndices?.length ?? 0) - 1 ? ", " : ""}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </div>
                     </div>
                   )}
-                  {isOwner && q.type !== "text" && q.correctIndices && (
-                    <div className="mt-1 text-xs text-gray-500">
-                      <span>Correct: </span>
-                      {q.correctIndices.map((idx, i) => (
-                        <span key={idx}>
-                          <MarkdownText content={q.options[idx] ?? String(idx)} inline className="inline" />
-                          {i < q.correctIndices!.length - 1 ? ", " : ""}
-                        </span>
-                      ))}
+                  {q.type !== "text" && q.correctIndices && q.correctIndices.length > 0 && (
+                    <div className="mt-3 text-sm text-gray-700">
+                      <span className="font-medium text-emerald-800/90">Correct answer</span>
+                      <div className="mt-1 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-3 py-2 text-gray-900">
+                        {q.correctIndices.map((idx, j) => (
+                          <span key={`${idx}-${j}`}>
+                            <MarkdownText content={q.options[idx] ?? String(idx)} inline className="inline" />
+                            {j < q.correctIndices!.length - 1 ? ", " : ""}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
                   {q.type === "text" && (
-                    <div className="mt-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-800">
-                      {ans?.text?.trim() ? <MarkdownText content={ans.text} className="whitespace-pre-wrap" /> : "—"}
+                    <div className="mt-2 text-sm text-gray-700">
+                      <span className="font-medium text-gray-600">Your answer</span>
+                      <div className="mt-1 rounded-lg bg-gray-50 p-3 text-gray-800">
+                        {ans?.text?.trim() ? <MarkdownText content={ans.text} className="whitespace-pre-wrap" /> : "—"}
+                      </div>
                     </div>
                   )}
-                  {isOwner && q.type === "text" && (q.referenceAnswer ?? "").trim() && (
-                    <div className="mt-2 rounded-lg border border-[#d8e3dd] bg-[#f6faf8] p-3 text-sm text-[#3f4d48]">
+                  {q.type === "text" && (q.referenceAnswer ?? "").trim() && (
+                    <div className="mt-3 rounded-lg border border-[#d8e3dd] bg-[#f6faf8] p-3 text-sm text-[#3f4d48]">
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#5f6b66]">
                         Reference answer
                       </p>

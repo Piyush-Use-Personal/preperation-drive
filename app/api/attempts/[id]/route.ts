@@ -26,8 +26,11 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const viewerRole = role === "owner" ? "owner" : "participant";
+  const submitted = attempt.status === "submitted";
   const pendingEvaluation =
-    attempt.status === "submitted" && hasPendingText(file, attempt.answers, attempt.textEvaluations);
+    submitted && hasPendingText(file, attempt.answers, attempt.textEvaluations);
+  const participantRevealObjectiveKeys = viewerRole === "participant" && submitted;
+  const participantRevealTextReference = viewerRole === "participant" && submitted && !pendingEvaluation;
 
   const review =
     attempt.status === "submitted"
@@ -65,8 +68,16 @@ export async function GET(_req: Request, { params }: Params) {
         type: q.type,
         options: q.options,
         marks: q.marks,
-        correctIndices: viewerRole === "owner" ? q.correctIndices : undefined,
-        referenceAnswer: viewerRole === "owner" ? q.referenceAnswer ?? "" : undefined,
+        correctIndices:
+          viewerRole === "owner" || (participantRevealObjectiveKeys && q.type !== "text")
+            ? q.correctIndices
+            : undefined,
+        referenceAnswer:
+          viewerRole === "owner"
+            ? (q.referenceAnswer ?? "")
+            : participantRevealTextReference
+              ? (q.referenceAnswer ?? "")
+              : "",
       })),
     },
   });
